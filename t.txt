@@ -1,0 +1,123 @@
+
+
+function random_matrix(n, symm=true, diag=4.0)
+    A = randn(n,n)
+    for i = 1:n
+        A[i,i] += diag
+    end
+    
+    if symm
+        A = (A + A') / 2
+    end
+    
+    return A
+end
+
+N = 12
+nb = 6
+ni = N - nb
+
+A = [
+ 3.73295   0.351419  -0.534708   0.301579   0.558047;
+  0.351419  6.48719    0.31895    0.198893   0.400289;
+ -0.534708  0.31895    4.81739    0.309232  -0.103873;
+  0.301579  0.198893   0.309232   5.411     -0.37619 ;
+    0.558047  0.400289  -0.103873  -0.37619    3.44621 ]
+
+
+A = random_matrix(N);
+
+
+Abb = A[1:nb, 1:nb];
+
+Abi = A[1:nb, (nb+1):N];
+
+Aib = A[(nb+1):N, 1:nb];
+
+Aii = A[(nb+1):N, (nb+1):N];
+
+using ArrayViews
+using Base.LinAlg.BLAS.gemm!
+using Base.LinAlg.BLAS.gemv!
+using Base.LinAlg.LAPACK.potrf!
+using Base.LinAlg.LAPACK.potrs!
+
+
+potrf!('L', Aii);
+
+M = copy(Aib);
+potrs!('L', Aii, M);
+
+gemm!('T', 'N', -1.0, M, Aib, 1.0, Abb);
+
+potrf!('L', Abb);
+
+f = float([1:N]);
+
+fbi = copy(f);
+
+fb = view(fbi, 1:nb)
+fi = view(fbi, (nb+1):N);
+
+gemv!('T', -1.0, M, fi, 1.0, fb);
+
+potrs!('L', Abb, fb);
+
+potrs!('L', Aii, fi)
+gemv!('N', -1.0, M, fb, 1.0, fi);
+
+x = copy(fbi)
+
+x0 = A\f
+
+x0 - x
+
+B = random_matrix(N, false)
+
+Bbb = B[1:nb, 1:nb]
+Bbi = B[1:nb, (nb+1):N]
+Bib = B[(nb+1):N, 1:nb]
+Bii = B[(nb+1):N, (nb+1):N];
+
+
+using Base.LinAlg.LAPACK.getrf!
+
+Bii, ipiv, info = getrf!(Bii);
+
+using Base.LinAlg.LAPACK.getrs!
+
+M2 = Bbi'
+
+getrs!('T', Bii, ipiv, M2)
+
+M2b = copy(Bib)
+getrs!('N', Bii, ipiv, M2b);
+
+gemm!('T', 'N', -1.0, M2, Bib, 1.0, Bbb);
+
+M2' * Bib - MM
+Bbb - Bbb2
+
+Bbb, ipiv2, info = getrf!(Bbb)
+
+g = float([1:N;])
+gbi = copy(g)
+
+gb = view(gbi, 1:nb)
+gi = view(gbi, (nb+1):N)
+
+
+gemv!('T', -1.0, M2, gi, 1.0, gb);
+
+getrs!('N', Bbb, ipiv2, gb);
+gb
+
+getrs!('N', Bii, ipiv, gi)
+gemv!('N', -1.0, M2b, gb, 1.0, gi);
+
+y = copy(gbi)
+y0 = B\g
+
+hcat(y0, y, y-y0)
+
+
